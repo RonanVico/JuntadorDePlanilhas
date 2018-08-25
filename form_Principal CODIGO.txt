@@ -1,0 +1,192 @@
+'24 08 2018
+'FEITO POR RONAN VICO
+'ANALISTA E CONSULTOR VBA
+'https://www.linkedin.com/in/ronan-vico/
+'SIGA ME NO LINKEDIN , E DEIXE SUA RECOMENDAÇÃO OBRIGADO!.
+'#@#@#@#@#@#@#@
+'ATENÇÃO O CÓDIGO È LIVRE , SINTA-SE AVONTADE PARA MODIFICA-LO ,
+'PORÉM DE OS DEVIDOS CRÉDITOS AO CRIADOR.
+'@#@#@#@#@#@#@#@#@#@
+
+Option Explicit
+Option Compare Text
+
+Private Sub btnFILES_Click()
+'Pede pra selecionar uma pasta e salva numa celula do excel para usar novamente depois quando reabrir
+
+    Dim pasta As String
+    
+    pasta = PickFolder
+    If pasta = "" Then
+        MsgBox "É necessario selecionar uma pasta!", vbCritical, "ATENÇÃO!"
+        Exit Sub
+    End If
+    ThisWorkbook.Sheets("PRINCIPAL").Cells(528, 70) = pasta
+    Principal.txtFilesFolder = ThisWorkbook.Sheets("PRINCIPAL").Cells(528, 70)
+End Sub
+
+
+Public Function PickFolder() As String
+'-- se foi escolhida alguma pasta
+1   If Application.FileDialog(4).Show Then
+        '-- retorna o path da pasta selecionada
+2       PickFolder = Application.FileDialog(4).SelectedItems(1)
+3   End If
+End Function
+
+Private Sub btnJuntaPlanilhas_Click()
+'Resume , made by RONAN VICO
+'Abre um arquivo excel e cria 1 workbook de saida Que sera salvo
+'na pasta escolhida no formulario e contera todas as planilhas da pasta de arquivos excel
+'que contem varias planilhas
+'Iremos passar Varias planilhas para 1 unico arquivo de saida.
+'Percorrendo todos os arquivos copiando cada Sheet para um unico arquivo e salvando no arquivo de saida.
+
+On Error GoTo err_handler
+  If Principal.txtFilesFolder = "" Or Principal.txtNewFileFolder = "" Then
+      MsgBox "É NECESSARIO ESCOLHER OS 2 Diretorios!", vbExclamation, "ATENÇÃO!"
+      Exit Sub
+  End If
+  
+  If Dir(Principal.txtFilesFolder, vbDirectory) = "" Then
+      MsgBox "A pasta de Arquivos excel Não Existe!", vbExclamation, "ATENÇÃO!"
+      Exit Sub
+  End If
+  
+  If Dir(Principal.txtNewFileFolder, vbDirectory) = "" Then
+      MsgBox "A pasta de saida do Arquivo Excel Não Existe!", vbExclamation, "ATENÇÃO!"
+      Exit Sub
+  End If
+  
+  'Objetos
+  Dim fso As Object 'File Sys Object
+  Dim fl As Object 'File
+  Dim folder As Object ' FOlder
+  Dim exc As Object ' Excel
+  Dim wbSaida As Object ' Workbook Saida
+  Dim wb As Object ' Workbook 0
+  Dim st As Object ' sheet
+
+  'Contadores
+  Dim total As Long: total = 0 ' Files total
+  Dim Executados As Long: Executados = 0 ' Files "OK" total
+  Dim nFl As Long 'Files
+  Dim contador As Long: contador = 0 ' st
+  
+  'BARAR DE PROGRESSo
+  Dim barraTotal As Long
+  Dim qtdAndar As Long
+
+  Set fso = CreateObject("Scripting.FileSystemObject")
+  Set folder = fso.GetFolder(Principal.txtFilesFolder)
+
+  'Verifica se tem arquivos e soma numa contador total
+  For Each fl In folder.Files
+      If Right(fl.Name, 3) = "xls" Or Right(fl.Name, 4) = "xlsx" Or Right(fl.Name, 4) = "xlsm" Then
+        total = total + 1
+      End If
+  Next fl
+  
+  'Se for 0 é porque não tem arquivos excel para juntar em um só , na pasta selecionad
+  If total = 0 Then
+      MsgBox "NÃO HÁ ARQUIVOS EXCEL PARA JUNTAR AS PLANILHAS NA PASTA SELECIONADA", vbExclamation, "ATENÇÃO!"
+      Exit Sub
+  End If
+  
+  'Começa a barra de progresso, suas medidas e deixando visivel
+  barraTotal = lblTotal.Width - 50
+  qtdAndar = barraTotal / total
+  lblCarregando.Visible = True
+  lblMsg.Visible = True
+  lblTotal.Visible = True
+  lblMsg.Caption = ""
+  lblCarregando.Width = "24,05"
+  
+  'Inicia um novo excel para trabalharmos melhor  e esconder sua visibilidade
+   Set exc = CreateObject("Excel.Application")
+   exc.DisplayAlerts = False
+   exc.Visible = False
+   'Set o novo workbook de saida
+   Set wbSaida = exc.Workbooks.Add
+
+   For Each fl In folder.Files
+      'Percorre a pasta procurando todos os arquivos excel
+      If Right(fl.Name, 3) = "xls" Or Right(fl.Name, 4) = "xlsx" Or Right(fl.Name, 4) = "xlsm" Then
+        'contador soma e atualiza o label
+        nFl = nFl + 1
+        lblMsg.Caption = "COPIANDO ARQUIVO " & nFl & " DE " & total
+        'Abrimos o arquivo com o nosso excel auxiliar
+        Set wb = exc.Workbooks.Open(fl.Path)
+        
+        'Percorre o arquivo aberto que queremos importar as planilhas
+        'Indo de Sheet em Sheet (todas) e copiando para nosso workbook de saida
+        For Each st In wb.Sheets
+            st.Copy after:=wbSaida.Sheets(wbSaida.Sheets.Count)
+            contador = contador + 1
+        Next st
+        'Contador soma e fechar o workbook do arquivo que copiamos para ir para o proximo arquivo q iremos copiar
+        Executados = Executados + 1
+        wb.Close
+        Set wb = Nothing
+        'Atualiza barra de progresso
+        lblCarregando.Width = lblCarregando.Width + qtdAndar
+      End If
+  Next fl
+  
+  'Salva o arquivo na pasta de saida com o nome da data pra não ter q excluir arquivos antigos com mesmo nome
+  'Assim toda vez que rodar vai dar pra salvar
+  wbSaida.SaveAs (txtNewFileFolder & "\PlanilhasJuntadas_" & Format(Now, "dd\_yy\_yyyy\_\_hh\Hmm\Mss\S") & ".xlsx")
+  
+  
+
+err_handler:
+  If Err.Number <> 0 Then
+    MsgBox Err.Number & "  " & Err.Description, vbCritical, "HOUVE ERROS!"
+    exc.Quit
+    Set exc = Nothing
+  Else
+    Call MsgBox("PROCESSO FINALIZADO COM SUCESSO!!!" & vbNewLine & "Arquivo: " & wbSaida.Path & vbNewLine & "Foram Juntados " & Executados & " Arquivos de " & total & vbNewLine & "Total de planilhas: " & contador, vbInformation, "PROCESSO FINALIZADO!")
+    'Verifica se o Usuario quer abrir o arquivo ( o que é uma mentira ele ja esta aberto , iremos deixa-lo visibel apenas)
+    If MsgBox("DESEJA ABRIR O ARQUIVO?", vbInformation + vbYesNo, "PROCESSO FINALIZADO!") = vbYes Then
+       exc.Visible = True
+    Else
+      'Se ele nao quiser ver o arquivo apenas fechamos o arquivo que esta invisivel.
+      wbSaida.Close
+      exc.Quit
+      Set exc = Nothing
+    End If
+  End If
+  
+  'Limpamos a barra de progresso
+  lblCarregando.Visible = False
+  lblMsg.Visible = False
+  lblTotal.Visible = False
+  
+  
+  Principal.Hide
+  Exit Sub
+  Resume
+End Sub
+
+
+Private Sub btnOut_Click()
+'Pede pra selecionar uma pasta e salva numa celula do excel para usar novamente depois quando reabrir
+    Dim pasta As String
+    
+    pasta = PickFolder
+    If pasta = "" Then
+        MsgBox "É necessario selecionar uma pasta!", vbCritical, "ATENÇÃO!"
+        Exit Sub
+    End If
+    ThisWorkbook.Sheets("PRINCIPAL").Cells(528, 71) = pasta
+    Principal.txtNewFileFolder = ThisWorkbook.Sheets("PRINCIPAL").Cells(528, 71)
+
+
+End Sub
+
+
+Private Sub UserForm_Initialize()
+    'Pega os valores que já estão preenchido no excel e jogam no formulario
+    Principal.txtFilesFolder = ThisWorkbook.Sheets("PRINCIPAL").Cells(528, 70)
+    Principal.txtNewFileFolder = ThisWorkbook.Sheets("PRINCIPAL").Cells(528, 71)
+End Sub
